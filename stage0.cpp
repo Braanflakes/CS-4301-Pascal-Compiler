@@ -1,5 +1,3 @@
-// CS 4301 - Stage0 - EJ Smith, Brendan Murphey, Jacob Causer
-
 #include <ctime>
 #include <string>
 #include <fstream>
@@ -32,13 +30,6 @@ ifstream sourceFile;
 ofstream listingFile, objectFile;
 string token;
 char charac;
-bool errorFound = false;
-int lstLineNum = 0;
-char prevCharac = ' ';
-int boolCount = 0;
-int intCount = 0;
-int overflow = 0;
-bool progFound = false;
 const char END_OF_FILE = '$';	// arbitrary choice
 
 void CreateListingHeader();
@@ -68,122 +59,129 @@ bool isBoolean();
 
 int main(int argc, char **argv)
 {
-	sourceFile.open(argv[1]); //accepts input from argv[1]
-	listingFile.open(argv[2]); //generates a listing to argv[2]
-	objectFile.open(argv[3]); //generates an object code to argv[3]
+	// this program is the stage0 compiler for Pascallite. It will accept
+	// input from argv[1], generating a listing to argv[2], and object code to
+	// argv[3]
 	
-	CreateListingHeader(); //top
-	Parser(); //main
-	CreateListingTrailer(); //end
-	PrintSymbolTable(); //object file
-	return 0; //complete
+	sourceFile.open(argv[1]);
+	listingFile.open(argv[2]);
+	objectFile.open(argv[3]);
+	
+	CreateListingHeader();
+	Parser();
+	CreateListingTrailer();
+	
+	PrintSymbolTable();
+	
+	return 0;
 }
 
-// Creates the header for the listing file
 void CreateListingHeader()
 {
-	time_t now = time(NULL); //time (as given)
-	listingFile << left << "STAGE0:  " << "EJ Smith, Brendan Murphey, Jacob Causer\t" << ctime(&now) << "\n"; //names
-	listingFile << setw(22) << "LINE NO." << "SOURCE STATEMENT\n\n";	//line numbers and source statements should be aligned under the headings
+	time_t now = time(NULL);
+	listingFile << left << "STAGE0:\t" << "Brendan Murphey, EJ Smith, Jacob Causer\t" << ctime(&now) << "\n";
+	listingFile << left << setw(15)<< "LINE NO:" << "SOURCE STATEMENT\n";	
+	//line numbers and source statements should be aligned under the headings
 }
 
-// Begins the program
 void Parser()
 {
-	NextChar();// charac must be initialized to the first character of the source file
-	if (NextToken().compare("program")) //if the next token
+	NextChar();
+		// charac must be initialized to the first character of the source file
+	if (NextToken().compare("program"))
 		Error("keyword \"program\" expected");	// process error: keyword "program" expected;
-	Prog();// parser implements the grammar rules, calling first rule
+		
+	Prog();
+		// parser implements the grammar rules, calling first rule
 }
 
-// Creates the trailer for the listing file
 void CreateListingTrailer()
 {
-	listingFile << "\nCOMPILATION TERMINATED\t" << setw(5) << ((errorFound)? '1' : '0') << " ERRORS" << " ENCOUNTERED\n";
+	listingFile << "COMPILATION TERMINATED\t" << "0 ERRORS ENCOUNTERED";
 }
 
-// Prints the symbol table into the object file
 void PrintSymbolTable()
 {
+	// print symbol table to object file
 	vector<entry>::iterator it;
-	time_t now = time(NULL);
-	
-	objectFile << left << "STAGE0:  " << "EJ Smith, Brendan Murphey, Jacob Causer\t" << ctime(&now) << "\n";
-	objectFile << "Symbol Table\n\n";
 	
 	for (it = symbolTable.begin(); it < symbolTable.end(); ++it)
 	{
-		objectFile << left << setw(15) << it->externalName << "  ";
-		objectFile << left << setw(4) << it->internalName << "  ";
-		objectFile << right << setw(9) << ((it->dataType == 2)?"PROG_NAME":(it->dataType == 1)?"BOOLEAN":(it->dataType == 0)?"INTEGER":"") << "  ";
-		objectFile << right << setw(8) << ((it->mode == 1)?"CONSTANT":(it->mode == 0)?"VARIABLE":"") << "  ";
-		objectFile << right << setw(15) << ((it->value == "true")?"1":((it->value=="false")? "0" : it->value)) << "  ";
-		objectFile << right << setw(3) << right << ((it->alloc)?"NO":"YES");
-		objectFile << setw(3) << it->units << "\n";
+		objectFile << left << setw(15) << it->externalName;
+		objectFile << left << setw(4) << it->internalName;
+		objectFile << setw(9) << it->dataType;
+		objectFile << setw(8) << it->mode;
+		objectFile << setw(15) << it->value;
+		objectFile << setw(3) << it->alloc;
+		objectFile << setw(3) << it->units;
+		objectFile << "\n";
 	}
 }
 
-// Production 1
 void Prog() //token should be "program"
 {
-	if (token != "program"){
+	if (token != "program")
+	{
 		Error("keyword 'program' expected");
 	}
 	ProgStmt();
-	if (token == "const"){ 
+	if (token == "const")
+	{ 
 		Consts();
 	}
-	if (token == "var"){
+	if (token == "var")
+	{
 		Vars();
 	}
-	if (token != "begin"){
+	if (token != "begin")
+	{
 		Error("keyword 'begin' expected");
 	}
 	BeginEndStmt();
-	if (token[0] != END_OF_FILE){
+	if (token[0] != END_OF_FILE)
+	{
 		Error("no text may follow end");
 	}
 }
 
-// Production 2
 void ProgStmt() //token should be "program"
 {
 	string x;
 	if (token != "program")
+		//process error: keyword "program" expected
 		Error("keyword 'program' expected");
 	x = NextToken();
 	// note: NonKeyID only checks TOKENS
 	if (!NonKeyID())
+		//process error: program name expected
 		Error("program name expected");
 	if (NextToken() != ";")
+		//process error: semicolon expected
 		Error("semicolon expected");
 	NextToken();
 	Insert(x,PROG_NAME,CONSTANT,x,NO,0);
 }
 
-// Production 3
 void Consts() //token should be "const"
 {
 	if (token != "const")
 		Error("keyword \"const\" expected");
-	NextToken();
 	if (!NonKeyID())
 		Error("non-keyword identifier must follow \"const\"");
 	ConstStmts();
 }
 
-// Production 4
 void Vars() //token should be "var"
 {
 	if (token != "var")
+		//process error: keyword "var" expected
 		Error("keyword 'var' expected");
-	NextToken();
 	if (!NonKeyID())
+		//process error: non-keyword identifier must follow "var"
 		Error("non-keyword identifier  must follow 'var'");
 	VarStmts();
 }
 
-// Production 5
 void BeginEndStmt() //token should be "begin"
 {
 	if (token != "begin")
@@ -195,92 +193,90 @@ void BeginEndStmt() //token should be "begin"
 	NextToken();
 }
 
-// Production 6
 void ConstStmts() //token should be NON_KEY_ID
 {
 	string x,y;
-	int spot = -1;
-		
+	unsigned int i = 0;
+	bool isExternal = false;
+	
 	if (!NonKeyID())
-		Error("non-keyword identifier expected"); 
-	
+		Error("non-keyword identifier expected");
 	x = token;
-	
-	if (NextToken() != "="){
-		Error("\"=\" expected");
-	}
-	
+	if (NextToken() != "=")
+		Error("\"=\" expected"");
 	y = NextToken();
 	
-	if (y != "+" && y != "-" && y !="not" && !NonKeyID() && !isBoolean() && !isInteger())
+	
+	if (y != "+" || y != "-" || y != "not" || y != "true" || y != "false" || !NonKeyID()) || !isInteger() || !isBoolean())
 		Error("token to right of \"=\" illegal");
-			
+		
 	if (y == "+" || y == "-"){
-	NextToken();
-	if(!isInteger())
-		Error("integer expected after sign");
-	y = y + token;
+		NextToken();
+		//check if the token is an integer
+		if(!isInteger())
+			Error("integer expected after sign");
+		y = y + token;
 	}
+	
 	if (y == "not"){
 		NextToken();
-		for (uint i = 0; i < symbolTable.size(); i++){
-			if (symbolTable[i].externalName == token)
-				spot = i;
+		
+		//token == externalName?
+		for(; i < symbolTable.size(); ++i)
+		{
+			if(token == symbolTable[i].externalName){
+				isExternal = true;
+				break;	
+			}
 		}
 		
-		if (spot != -1){
-			if (symbolTable[spot].dataType != BOOLEAN)
-				Error("boolean expected after not");
-		}
-
-		else if(!isBoolean())
-			Error("boolean expected after not");
+		if((isExternal && symbolTable[i].dataType != BOOLEAN)|| !isBoolean())
+			Error("boolean expected after not")
 			
-		// token was external name?
-		if (spot != -1){
-			if (symbolTable[spot].value == "true")
+		if(isExternal){
+			if(symbolTable[i].value == "true"){
 				y = "false";
-			else if (symbolTable[spot].value == "false")
+			}else if(symbolTable[i].value == "false"){
 				y = "true";
-			else
+			}else
 				Error("invalid value for BOOLEAN type");
-		}
-		else if (token == "true"){ 
+		}else if(token == "true"){
 			y = "false";
 		}else{
-				y = "true";
+			y = "true";
 		}
 	}
+	
 	if (NextToken() != ";")
-		Error("\":\" expected");
-			
+		Error("semicolon expected");
+	
 	Insert(x,WhichType(y),CONSTANT,WhichValue(y),YES,1);
-		
+	
 	NextToken();
-		
+	
 	if (token != "begin" && token != "var" && !NonKeyID())
-		Error("non-keyword identifier, \"begin\", or \"var\" expected");
-
+		Error("non-keyword identifier, \"begin\" or \"var\" expected");
+	
 	if (NonKeyID())
 		ConstStmts();
 }
 
-// Production 7
 void VarStmts()	//token should now be NON_KEY_ID
 {
 	string x, y;
-	if (!NonKeyID())
+	if (!NonKeyID(token))
 		Error("non-keyword identifier expected");
 	x = Ids();
 	if (token != ":")
 		Error("\":\" expected");
 	NextToken();
 	if (token != "integer" && token != "boolean")
-		Error("illegal type follows \":\"");
+		Error(" illegal type follows \":\"");
 	y = token;
 	if (NextToken() != ";")
 		Error("semicolon expected");
 	
+	//-----DEBUGGING HERE-----
 	if (y == "integer")
 		Insert(x, INTEGER, VARIABLE, "", YES, 1);
 	else if (y == "boolean")
@@ -290,20 +286,18 @@ void VarStmts()	//token should now be NON_KEY_ID
 	else
 		Error("not a valid storeType");
 	
-	NextToken();
 	//if this doesn't work, put nexttoken before the if, and replace it with token
-	if (token != "begin" && !NonKeyID())
+	if (NextToken() != "begin" || !NonKeyID())
 		Error("non-keyword identifier or \"begin\" expected");
-	if (NonKeyID())
+	if (!NonKeyID(token))
 		VarStmts();
 }
 
-// Production 8
 string Ids() //token should be NON_KEY_ID
 {
 	string temp,tempString;
 	
-	if (!NonKeyID())
+	if (!NonKeyID(token))
 		Error("non-keyword identifier expected");
 	tempString = token;
 	temp = token;
@@ -317,7 +311,8 @@ string Ids() //token should be NON_KEY_ID
 	return tempString;
 }
 
-// Inserts a new entry into the symbol table
+ //create symbol table entry for each identifier in list of external names
+ //Multiply inserted names are illegal
 void Insert(string externalName, storeType inType, modes inMode, string inValue,
  allocation inAlloc, int inUnits)
 {
@@ -359,14 +354,10 @@ void Insert(string externalName, storeType inType, modes inMode, string inValue,
 				my.units = inUnits;
 				symbolTable.push_back(my);
 			}
-			++overflow;
-			if (overflow > 256)
-				Error("symbol table entries have exceeded the maximum allowed value");
 		}
 	}
 }
 
-// Determines which data type "name" has
 storeType WhichType(string name){
 	string::iterator it;
 	vector<entry>::iterator vit;
@@ -392,11 +383,11 @@ storeType WhichType(string name){
 			return (*vit).dataType;
 	}
 	
-	Error("reference to undefined constant1");
+	Error("reference to undefined constant");
 }
 
 
-// Determines which value "name" has
+
 string WhichValue(string name)
 {
 	string::iterator it;
@@ -405,7 +396,8 @@ string WhichValue(string name)
 
 	if (name == "true" || name == "false")
 		isLiteral = true;
-	else if (isdigit(name[0]) || name[0] == '+' || name[0] == '-')
+		
+	if (isdigit(name[0]))
 	{
 		for (it = name.begin() + 1; it < name.end(); ++it)
 		{
@@ -423,15 +415,12 @@ string WhichValue(string name)
 			return (*vit).value;
 	}
 	
-	if (name == "")
-		Error("reference to undefined constant2");
+	Error("reference to undefined constant");
 	
-	return name;
 	
 }
 
-// Returns the next token or end of file marker
-string NextToken(){ 
+string NextToken(){ //returns the next token or end of file marker
 	token = "";
 	while (token == ""){
 		if(charac == '{'){ //process comment
@@ -449,23 +438,17 @@ string NextToken(){
 			}else if(charac == '}'){
 				Error("token can't start \'}\'");
 			}
-		}else if(charac == '}'){
+		}
+		else if(charac == '}'){
 			Error("\'}\' cannot begin token");
-		}else if(isspace(charac)){
+		}
+		else if(isspace(charac)){
 			NextChar();
 		}
 		else if (isSpecial(charac)){            
 			token = charac;
             NextChar();
         }
-		else if(charac == ':'){
-			token = charac;
-			NextChar();
-			if(charac == '='){
-				token+=charac;
-				NextChar();
-			}
-		}
 		else if(charac == '_'){ //no leading _
 			Error("\'_\' cannot start an identifier");
 		}
@@ -499,13 +482,11 @@ string NextToken(){
 	return token;
 }
 
-//special character?
 bool isSpecial(char chara){
 	return (chara == ',' || charac == ';' || charac == '=' || charac == '+' || charac == '-' ||
 		charac == '.' ||  charac =='(' || charac ==')'  || charac == '*');
 }
 
-//lowercase
 bool isLetter(char chara){
 	return (islower(chara) || isdigit(chara) || chara == '_');
 }
@@ -513,6 +494,8 @@ bool isLetter(char chara){
 char NextChar(){
 	char myNext;
 	sourceFile.get(myNext);
+	static int lstLineNum = 0;
+	static char prevCharac = ' ';
 	
 	//http://www.cplusplus.com/reference/ios/ios/good/
 	if(!sourceFile.good()){
@@ -522,36 +505,38 @@ char NextChar(){
 		charac = myNext;		
 		if(lstLineNum == 0){
 			lstLineNum++;
-			listingFile << setw(5) << right << lstLineNum << '|';
+			listingFile << setw(5) << lstLineNum << '|';
 		}else if (prevCharac == '\n'){
 			lstLineNum++;
-			listingFile << setw(5) << right << lstLineNum << '|';
+			listingFile << setw(5) << lstLineNum << '|';
 		}
 		listingFile << charac;
 	}
 	return charac;
 }
 
-// Displays errors to the listing file
 void Error(string error){
-	errorFound = true;
-	listingFile << "\nError: Line " << lstLineNum << ": " << error << "\n";
+	listingFile << "Error: " << error << "\n";
 	CreateListingTrailer();
 	sourceFile.close();
 	listingFile.close();
 	objectFile.close();
-	exit(EXIT_FAILURE);
+	terminate();
 }
 
-// Generates the internal name
 string genInternalName(storeType genType){
+	static int boolCount = 0;
+	static int intCount = 0;
+	static bool progFound = false;
 	ostringstream myOut;
 	
 	if(genType == INTEGER){
-		myOut << "I" << intCount;
+		myOut << intCount;
+		myOut << "I" << boolCount;
 		intCount++;
 	}else if(genType == BOOLEAN){
-		myOut << "B" << boolCount;
+		myOut << intCount;
+		myOut << "B" << intCount;
 		boolCount++;
 	}else if (genType == PROG_NAME){
 		if (progFound == false){
@@ -564,36 +549,32 @@ string genInternalName(storeType genType){
 	return myOut.str();
 }
 
-// Returns true if token is a NonKeyID, and false otherwise
-bool NonKeyID()
-{
-    if(token[0]=='_')
-        Error("cannot begin with \"_\" ");
-       
-    if(isupper(token[0]))
-		Error("upper case characters not allowed");
+//NonKeyID CHECKS TOKEN!
+bool NonKeyID(){
+	if(token[0] == '_') //check if first character is '_'
+		Error("cannot begin with \"_\"");
 	
-    if (!isalpha(token[0]))
+	if (!isalpha(token[0]))	// check if the first char is alpha
 		return false;
-	
-	
-    // go through each char
-    for (int x = 1; x < (int)token.length(); x++)
-    {
-        if(isupper(token[x]))
-            Error("upper case characters not allowed");
-        if ( !isalpha(token[x]) && !isdigit(token[x]) && token[x] != '_' )
-            return false;
-    }
-    return(find(keys, keys+10, token) != keys+10)? false : true; //token isn't key ID
+		
+	for (int i = 0; i < (int)token.length(); i++)	// check token
+	{
+		if(isupper(token[i]))
+			Error("upper case characters not allowed");
+		if (!isalpha(s[i]) && s[i] != '_' && !isdigit(s[i]))
+			return false;
+	}
+	if(find(keys, keys+10, token) != keywords+10) //make sure token isn't a key...
+		return false;
+	return true;
 }
 
-//is it a boolean type?
+//if the token is true or false, it's a BOOLEAN
 bool isBoolean(){
 	return(token=="true" || token == "false");
 }
 
-//all chars must be a digit for it to be an integer type. is it so?
+//every character in token must be a digit to be an integer
 bool isInteger(){
 	for(int i = 0; i < (int)token.length(); i++){
 		if(!isdigit(token[i]))
